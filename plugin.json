@@ -1,0 +1,57 @@
+{
+  "id": "channel-lark",
+  "name": "Lark / Feishu",
+  "description": "Official Lark / Feishu WebSocket + OpenAPI channel plugin for Bazaar Compute Node",
+  "kind": "channel",
+  "version": "0.4.0-rc.1",
+  "apiVersion": 1,
+  "minHostVersion": "0.4.0-rc.1",
+  "license": "Apache-2.0",
+  "main": "index.lua",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["appId", "appSecret"],
+    "properties": {
+      "appId": {
+        "type": "string",
+        "title": "App ID",
+        "description": "Lark / Feishu application App ID (cli_...)"
+      },
+      "appSecret": {
+        "type": "string",
+        "title": "App Secret",
+        "description": "Lark / Feishu application App Secret",
+        "writeOnly": true
+      },
+      "region": {
+        "type": "string",
+        "title": "Region",
+        "description": "Lark / Feishu region preset: feishu (https://open.feishu.cn) or lark (https://open.larksuite.com)",
+        "enum": ["feishu", "lark"],
+        "default": "feishu"
+      },
+      "domain": {
+        "type": "string",
+        "title": "API Base URL",
+        "description": "API base URL override: https://open.feishu.cn (Feishu) or https://open.larksuite.com (Lark)",
+        "default": "https://open.feishu.cn"
+      }
+    }
+  },
+  "capabilities": [
+    "typing",
+    "interactive_prompt",
+    "dm_resolve",
+    "conversation_key"
+  ],
+  "permissions": {
+    "network": [
+      "open.feishu.cn",
+      "*.feishu.cn",
+      "open.larksuite.com",
+      "*.larksuite.com"
+    ],
+    "attachments": true
+  }
+}
