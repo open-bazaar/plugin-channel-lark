@@ -438,10 +438,71 @@ local function resolveRegionAndDomain(config)
   }
 end
 
+local function decodePercentSegment(s)
+  if type(s) ~= "string" then
+    return ""
+  end
+  return (s:gsub("%%(%x%x)", function(hex)
+    return string.char(tonumber(hex, 16))
+  end))
+end
+
+local function providerMessageAnchor(value)
+  local txt = providerText(value)
+  if not txt or string.sub(txt, 1, 6) == "group:" then
+    return nil
+  end
+  return txt
+end
+
 local function parseTarget(target)
   local raw = providerText(trim(target))
   if not raw then
     error("lark: invalid or empty target", 0)
+  end
+  -- 0.3 canonical provider_thread_id format: lark:bot:<botOpenId>:chat:<chatOrOpenId>:thread:<threadId>
+  if string.sub(raw, 1, 9) == "lark:bot:" then
+    local rawBotId, rawChatOrOpen, rawThreadId = string.match(raw, "^lark:bot:([^:]+):chat:([^:]+):thread:([^:]+)$")
+    if rawBotId and rawChatOrOpen and rawThreadId then
+      local botId = providerText(decodePercentSegment(rawBotId))
+      local cleanChat = providerText(decodePercentSegment(rawChatOrOpen))
+      local cleanThread = providerText(decodePercentSegment(rawThreadId))
+      if botId and cleanChat and cleanThread then
+        local isOpenId = string.sub(cleanChat, 1, 3) == "ou_"
+        if isOpenId then
+          return {
+            kind = "dm",
+            receiveId = cleanChat,
+            receiveIdType = "open_id",
+            chatId = cleanChat,
+            openId = cleanChat,
+            threadId = "",
+            botId = botId,
+          }
+        end
+        if cleanThread ~= "0" then
+          return {
+            kind = "thread",
+            receiveId = cleanChat,
+            receiveIdType = "chat_id",
+            chatId = cleanChat,
+            openId = "",
+            threadId = cleanThread,
+            botId = botId,
+          }
+        end
+        return {
+          kind = "group",
+          receiveId = cleanChat,
+          receiveIdType = "chat_id",
+          chatId = cleanChat,
+          openId = "",
+          threadId = "",
+          botId = botId,
+        }
+      end
+    end
+    error('lark: invalid target "' .. raw .. '"', 0)
   end
   if string.sub(raw, 1, 3) == "dm:" then
     local id = providerText(trim(string.sub(raw, 4)))
@@ -511,6 +572,12 @@ end
 
 local function conversationKey(target)
   local parsed = parseTarget(target)
+  local bid = (botIdentity and botIdentity.id) or parsed.botId or ""
+  if bid ~= "" then
+    local chatOrOpen = parsed.kind == "dm" and parsed.receiveId or parsed.chatId
+    local tid = (parsed.kind == "thread" and parsed.threadId ~= "") and parsed.threadId or "0"
+    return "lark:bot:" .. bid .. ":chat:" .. chatOrOpen .. ":thread:" .. tid
+  end
   if parsed.kind == "dm" then
     return "lark:" .. regionKey .. ":dm:" .. parsed.receiveId
   end
@@ -521,6 +588,10 @@ local function conversationKey(target)
 end
 
 local function groupConversationKey(chatId)
+  local bid = (botIdentity and botIdentity.id) or ""
+  if bid ~= "" then
+    return "lark:bot:" .. bid .. ":chat:" .. chatId .. ":thread:0"
+  end
   return "lark:" .. regionKey .. ":group:" .. chatId
 end
 
@@ -1220,8 +1291,8 @@ local function resolveSenderInfo(sender)
   local displayName = lookupSenderName(openId)
   return {
     senderId = openId,
-    senderHandle = displayName or openId,
-    senderName = displayName or openId,
+    senderHandle = openId,
+    senderName = displayName or "",
     senderType = "human",
   }
 end
@@ -1288,7 +1359,7 @@ local function buildInboundEvent(msg, opts)
   elseif opts.kind == "dm" then
     mentionsAgent = true
   else
-    mentionsAgent = projected.mentionedBot and true or false
+    mentionsAgent = (projected.mentionedBot and true or false) or (opts.replyToBot == true)
     if not mentionsAgent and botIdentity then
       for _, m in pairs(mentions) do
         if m.openId == botIdentity.id or ((not m.openId or m.openId == "") and m.displayName == botIdentity.name) then
@@ -1320,6 +1391,12 @@ local function buildInboundEvent(msg, opts)
   }
   if opts.parentConvKey and opts.parentConvKey ~= "" then
     ev.parentConversationKey = opts.parentConvKey
+    if opts.parentTarget and opts.parentTarget ~= "" then
+      ev.parentTarget = opts.parentTarget
+    end
+    if opts.parentDisplayName and opts.parentDisplayName ~= "" then
+      ev.parentDisplayName = opts.parentDisplayName
+    end
   end
   return ev
 end
@@ -1357,6 +1434,8 @@ local function fetchQuotedParent(parentId, ctx)
     target = ctx.target,
     convKey = ctx.convKey,
     parentConvKey = ctx.parentConvKey,
+    parentTarget = ctx.parentTarget,
+    parentDisplayName = ctx.parentDisplayName,
     kind = ctx.kind,
     displayName = ctx.displayName,
     sender = parent.sender,
@@ -1461,17 +1540,26 @@ local function processInboundEvent(payloadObj)
     displayName = groupTitle or chatId
   end
 
+  local parentTarget = (not isDM and threadId) and ("group:" .. chatId) or ""
+  local replyToBot = false
   if parentId then
     local quotedEvent = fetchQuotedParent(parentId, {
       chatId = chatId,
       target = target,
       convKey = convKey,
       parentConvKey = parentConvKey,
+      parentTarget = parentTarget,
+      parentDisplayName = displayName,
       kind = kind,
       displayName = displayName,
     })
-    if quotedEvent and emitFn and not stopping then
-      emitFn(quotedEvent)
+    if quotedEvent then
+      if botIdentity and quotedEvent.senderId == botIdentity.id then
+        replyToBot = true
+      end
+      if emitFn and not stopping then
+        emitFn(quotedEvent)
+      end
     end
   end
 
@@ -1479,15 +1567,19 @@ local function processInboundEvent(payloadObj)
     target = target,
     convKey = convKey,
     parentConvKey = parentConvKey,
+    parentTarget = parentTarget,
+    parentDisplayName = displayName,
     kind = kind,
     displayName = displayName,
     sender = sender,
     replyToId = parentId or "",
+    replyToBot = replyToBot,
     forceMentionsAgent = nil,
     silent = false,
   })
 
-  if childEvent.body == "" and #childEvent.attachments == 0 then
+  -- 0.3 parity: preserve bare @BotName pings even when stripped body is empty.
+  if childEvent.body == "" and #childEvent.attachments == 0 and not childEvent.mentionsAgent then
     return
   end
   if emitFn and not stopping then
@@ -2548,8 +2640,11 @@ local function send(request)
   end
   local req = type(request) == "table" and request or {}
   local parsed = parseTarget(req.target)
+  if parsed.botId and parsed.botId ~= "" and parsed.botId ~= botIdentity.id then
+    error("lark: outbound route belongs to another bot", 0)
+  end
   local inThread = parsed.kind == "thread"
-  local anchor = providerText(req.replyToId)
+  local anchor = providerMessageAnchor(req.replyToId)
   if not anchor and inThread then
     anchor = getTopicRoot(parsed.threadId)
   end
@@ -2643,7 +2738,7 @@ local function setTyping(_target, active, meta)
   if not active or stopping or not botIdentity then
     return
   end
-  local messageId = isRecord(meta) and providerText(meta.messageId) or nil
+  local messageId = isRecord(meta) and providerMessageAnchor(meta.messageId) or nil
   if not messageId then
     return
   end
@@ -2681,8 +2776,11 @@ local function promptInteraction(prompt)
   end
 
   local parsed = parseTarget(p.target)
+  if parsed.botId and parsed.botId ~= "" and parsed.botId ~= botIdentity.id then
+    error("lark: approval route belongs to another bot", 0)
+  end
   local inThread = parsed.kind == "thread"
-  local anchor = providerText(p.replyToId)
+  local anchor = providerMessageAnchor(p.replyToId)
   if not anchor and inThread then
     anchor = getTopicRoot(parsed.threadId)
   end

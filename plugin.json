@@ -11,7 +11,7 @@
   "configSchema": {
     "type": "object",
     "additionalProperties": false,
-    "required": ["appId", "appSecret"],
+    "required": ["appId"],
     "properties": {
       "appId": {
         "type": "string",
@@ -23,6 +23,11 @@
         "title": "App Secret",
         "description": "Lark / Feishu application App Secret",
         "writeOnly": true
+      },
+      "appSecretEnv": {
+        "type": "string",
+        "title": "App Secret Env Var",
+        "description": "Optional environment variable name containing the Lark / Feishu App Secret"
       },
       "region": {
         "type": "string",
@@ -52,6 +57,7 @@
       "open.larksuite.com",
       "*.larksuite.com"
     ],
-    "attachments": true
+    "attachments": true,
+    "env": true
   }
 }
