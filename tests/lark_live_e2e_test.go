@@ -409,11 +409,13 @@ func TestLiveLarkE2E(t *testing.T) {
 		t.Fatalf("driver send open: %v", err)
 	}
 	var reviewConv reviewConversation
+	var lastRevs []reviewConversation
 	revDeadline := time.Now().Add(liveWaitTimeout)
 	for time.Now().Before(revDeadline) {
 		revs, _ := activeNode.listPendingReviews(agentID)
+		lastRevs = revs
 		for _, r := range revs {
-			if r.Target == "group:"+chatID {
+			if r.ProviderTarget == "group:"+chatID || r.Target == "group:"+chatID {
 				reviewConv = r
 				break
 			}
@@ -424,7 +426,8 @@ func TestLiveLarkE2E(t *testing.T) {
 		time.Sleep(500 * time.Millisecond)
 	}
 	if reviewConv.ID == "" {
-		t.Fatalf("timed out waiting for pending Lark review for group:%s", chatID)
+		evs, _ := activeNode.eventsSince(0)
+		t.Fatalf("timed out waiting for pending Lark review for group:%s (pending=%+v, events=%d)", chatID, lastRevs, len(evs))
 	}
 	runBCN(t, bcnBin, homeDir, nil, "agent", "review", "approve", reviewConv.ID)
 

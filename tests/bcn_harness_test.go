@@ -257,13 +257,15 @@ type auditEvent struct {
 }
 
 type reviewConversation struct {
-	ID           string `json:"id"`
-	AgentID      string `json:"agentId"`
-	ChannelID    string `json:"channelId"`
-	Target       string `json:"target"`
-	Kind         string `json:"kind"`
-	DisplayName  string `json:"displayName"`
-	ReviewStatus string `json:"reviewStatus"`
+	ID              string `json:"id"`
+	AgentID         string `json:"agentId"`
+	ChannelID       string `json:"channelId"`
+	Target          string `json:"target"`
+	ConversationKey string `json:"conversationKey"`
+	ProviderTarget  string `json:"providerTarget"`
+	Kind            string `json:"kind"`
+	DisplayName     string `json:"displayName"`
+	ReviewStatus    string `json:"reviewStatus"`
 }
 
 type runningBCN struct {
