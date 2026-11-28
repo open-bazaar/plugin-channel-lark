@@ -1,0 +1,2 @@
+Bazaar Compute 0.4 Lark E2E outbound attachment payload.
+Line 2: UTF-8 verification — 飞书端到端测试！
