@@ -1,0 +1,15 @@
+{
+  "id": "harness-e2e-echo",
+  "name": "E2E Echo Harness",
+  "description": "Deterministic Lua test harness executing real bcc commands for Lark channel E2E tests",
+  "kind": "harness",
+  "version": "0.4.0",
+  "apiVersion": 1,
+  "minHostVersion": "0.4.0-rc.1",
+  "license": "Apache-2.0",
+  "main": "index.lua",
+  "capabilities": ["inspect"],
+  "permissions": {
+    "exec": ["bcn"]
+  }
+}
