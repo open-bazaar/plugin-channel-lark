@@ -40,7 +40,7 @@ jobs:
           GONOSUMDB: github.com/yuchanns/bazaar-compute-node
         run: |
           mkdir -p "$RUNNER_TEMP/bin"
-          GOBIN="$RUNNER_TEMP/bin" go install -ldflags "-X main.HostVersion=0.4.0" github.com/yuchanns/bazaar-compute-node/cmd/bcn@0.4
+          GOBIN="$RUNNER_TEMP/bin" go install -ldflags "-X main.HostVersion=0.4.0-rc.1" github.com/yuchanns/bazaar-compute-node/cmd/bcn@0.4
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
           "$RUNNER_TEMP/bin/bcn" --version
       - name: Vet & Test (offline)
@@ -71,7 +71,7 @@ jobs:
           GONOSUMDB: github.com/yuchanns/bazaar-compute-node
         run: |
           mkdir -p "$RUNNER_TEMP/bin"
-          GOBIN="$RUNNER_TEMP/bin" go install -ldflags "-X main.HostVersion=0.4.0" github.com/yuchanns/bazaar-compute-node/cmd/bcn@0.4
+          GOBIN="$RUNNER_TEMP/bin" go install -ldflags "-X main.HostVersion=0.4.0-rc.1" github.com/yuchanns/bazaar-compute-node/cmd/bcn@0.4
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
           "$RUNNER_TEMP/bin/bcn" --version
       - name: Run Live Lark E2E
